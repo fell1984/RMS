@@ -266,6 +266,11 @@ class UploadManager(multiprocessing.Process):
             return None
 
 
+        # Empty the current queue
+        while self.file_queue.qsize() > 0:
+            self.file_queue.get(block=False, timeout=1)
+
+
         # Read the queue file
         with open(self.upload_queue_file_path) as f:
             
@@ -301,6 +306,11 @@ class UploadManager(multiprocessing.Process):
         # Convert the queue to a list
         file_list = [file_name for file_name in self.file_queue.queue]
 
+        # Only take unique entries
+        file_list = sorted(list(set(file_list)))
+
+        log.info("Saving upload queue with entries:")
+
         # If overwrite is true, save the queue to the holding file completely
         if overwrite:
 
@@ -311,6 +321,7 @@ class UploadManager(multiprocessing.Process):
             with open(self.upload_queue_file_path, 'w') as f:
                 for file_name in file_list:
                     f.write(file_name + '\n')
+                    log.info("... {:s}".format(file_name))
 
         else:
 
@@ -401,6 +412,9 @@ class UploadManager(multiprocessing.Process):
                 # Save the updated queue
                 self.saveQueue(overwrite=True)
                 tries = 0
+
+                # Reload queue
+                self.loadQueue()
 
             # If the upload failed, put the file back on the list and wait a bit
             else:
