@@ -270,6 +270,7 @@ class UploadManager(multiprocessing.Process):
         while self.file_queue.qsize() > 0:
             self.file_queue.get(block=False, timeout=1)
 
+        log.info("Loading upload queue from disk")
 
         # Read the queue file
         with open(self.upload_queue_file_path) as f:
@@ -291,6 +292,7 @@ class UploadManager(multiprocessing.Process):
 
                 # Add the file if it was not already in the queue
                 if not file_name in self.file_queue.queue:
+                    log.info("Loaded file: {:s}".format(file_name))
                     self.file_queue.put(file_name)
 
 
