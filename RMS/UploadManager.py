@@ -220,6 +220,7 @@ class UploadManager(multiprocessing.Process):
         self.upload_queue_file_path = os.path.join(self.config.data_dir, self.config.upload_queue_file)
 
         # Load the list of files to upload, and have not yet been uploaded
+        log.info("Loaded from {:s}:".format(self.config.upload_queue_file))
         self.loadQueue()
 
 
@@ -266,10 +267,6 @@ class UploadManager(multiprocessing.Process):
             return None
 
 
-        # Empty the current queue
-        while self.file_queue.qsize() > 0:
-            self.file_queue.get(block=False, timeout=1)
-
         log.info("Loading upload queue from disk")
 
         # Read the queue file
@@ -292,7 +289,7 @@ class UploadManager(multiprocessing.Process):
 
                 # Add the file if it was not already in the queue
                 if not file_name in self.file_queue.queue:
-                    log.info("Loaded file: {:s}".format(file_name))
+                    log.info("Loaded file not already in the queue: {:s}".format(file_name))
                     self.file_queue.put(file_name)
 
 
@@ -311,10 +308,10 @@ class UploadManager(multiprocessing.Process):
         # Only take unique entries
         file_list = sorted(list(set(file_list)))
 
-        log.info("Saving upload queue with entries:")
-
         # If overwrite is true, save the queue to the holding file completely
         if overwrite:
+
+            log.info("Overwriting {:s} with entries:".format(self.config.upload_queue_file))
 
             # Make the data directory if it doesn't exist
             mkdirP(self.config.data_dir)
@@ -329,6 +326,8 @@ class UploadManager(multiprocessing.Process):
 
             # Load the list from the file and make sure to write only the entries not already in the file
 
+            log.info("Adding to {:s}:".format(self.config.upload_queue_file))
+
             # Get a list of entries in the holding file
             existing_list = []
             with open(self.upload_queue_file_path) as f:
@@ -341,29 +340,7 @@ class UploadManager(multiprocessing.Process):
                 for file_name in file_list:
                     if file_name not in existing_list:
                         f.write(file_name + '\n')
-
-
-    def removeFromQueue(self, item):
-        """ Remove a specific entry from the file upload queue. """
-
-        with self.queue_lock:
-
-            temp_list = []
-            while self.file_queue.qsize() > 0:
-
-                # Get a file from the queue
-                file_name = self.file_queue.get()
-
-                # If the file is identical to the given item, skip it
-                if file_name == item:
-                    continue
-
-                # Store the non-matching names
-                temp_list.append(file_name)
-
-            # Put all other entries back into the file queue
-            for entry in reversed(temp_list):
-                self.file_queue.put(entry)
+                        log.info("... {:s}".format(file_name))
 
 
 
@@ -377,7 +354,7 @@ class UploadManager(multiprocessing.Process):
 
         # Skip uploading if the upload is already in progress
         if self.upload_in_progress.value:
-            return
+            return None
 
 
         # Set flag that the upload as in progress
@@ -401,25 +378,15 @@ class UploadManager(multiprocessing.Process):
             upload_status = uploadSFTP(self.config.hostname, self.config.stationID.lower(), data_path, \
                 self.config.remote_dir, [f_name], rsa_private_key=self.config.rsa_private_key)
 
-            # Reload the queue, in case the file took very long to upload and more were added
-            self.loadQueue()
-
-            # Remove the file that was just uploaded
-            self.removeFromQueue(file_name)
 
             # If the upload was successful, rewrite the holding file, which will remove the uploaded file
             if upload_status:
                 log.info('Upload successful!')
 
-                # Remove the uploaded file from the queue
-                self.removeFromQueue(file_name)
-
                 # Save the updated queue
                 self.saveQueue(overwrite=True)
                 tries = 0
 
-                # Reload queue
-                self.loadQueue()
 
             # If the upload failed, put the file back on the list and wait a bit
             else:
