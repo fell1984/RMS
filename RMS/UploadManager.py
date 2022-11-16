@@ -404,6 +404,9 @@ class UploadManager(multiprocessing.Process):
             # Reload the queue, in case the file took very long to upload and more were added
             self.loadQueue()
 
+            # Remove the file that was just uploaded
+            self.removeFromQueue(file_name)
+
             # If the upload was successful, rewrite the holding file, which will remove the uploaded file
             if upload_status:
                 log.info('Upload successful!')
