@@ -9,8 +9,8 @@ fi ;
 DIR=$(realpath $DIR)
 
 
-# Get full path of Desktop
-DESKTOP=$(realpath ~/Desktop)
+# Get full path of Desktop independently of the language settings
+DESKTOP=$(xdg-user-dir DESKTOP)
 
 # Create links to scripts, so they can be updated
 ln -sf $DIR/CMNbinViewer_env.sh $DESKTOP/CMNbinViewer.sh
